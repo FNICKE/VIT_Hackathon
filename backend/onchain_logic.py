@@ -5,6 +5,7 @@ import os
 from ai_agent.graph import GroupState
 # Initialising Algorand client
 ALGOD_ADDRESS = "https://testnet-api.algonode.cloud"
+# Token would be added soon
 ALGOD_TOKEN = ""
 algod_client = algod.AlgodClient(ALGOD_TOKEN, ALGOD_ADDRESS)
 
@@ -35,8 +36,9 @@ def onchain_node(state: GroupState) -> GroupState:
                 )
 
                 # SIGNING REQUIRED
-                #signed_txn = txn.sign(private_key)
-                #txid = algod_client.send_transaction(signed_txn)
+                private_key = os.getenv("PRIVATE_KEY")
+                signed_txn = txn.sign(private_key)
+                txid = algod_client.send_transaction(signed_txn)
 
                 executed_actions[user_id] = {
                     "wallet_deducted": True,

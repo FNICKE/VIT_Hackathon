@@ -1,0 +1,2 @@
+# Ignore dot env file which contains private key
+.env
