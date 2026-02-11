@@ -1,35 +1,43 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google'; // 1. Import the Provider
+import Navbar from './componant/Navbar'; 
+import Footer from './componant/Footer';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
-function App() {
-  const [count, setCount] = useState(0)
+const LayoutWrapper = ({ children }) => {
+  const location = useLocation();
+  const hideNavbarFooter = location.pathname === '/login' || location.pathname === '/register';
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="flex flex-col min-h-screen">
+      {!hideNavbarFooter && <Navbar />}
+      <main className={`flex-grow ${!hideNavbarFooter ? 'pt-20' : ''}`}>
+        {children}
+      </main>
+      {!hideNavbarFooter && <Footer />}
+    </div>
+  );
+};
+
+const App = () => {
+  return (
+    /* 2. Wrap everything here. Replace the text below with your real ID later */
+    <GoogleOAuthProvider clientId="YOUR_CLIENT_ID_HERE.apps.googleusercontent.com">
+      <Router>
+        <LayoutWrapper>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Routes>
+        </LayoutWrapper>
+      </Router>
+    </GoogleOAuthProvider>
+  );
 }
 
-export default App
+export default App;
