@@ -15,3 +15,5 @@ numpy
 scipy
 pytest
 loguru
+py-algorand-sdk
+
