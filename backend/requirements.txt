@@ -1,5 +1,5 @@
 fastapi
-uvicorn
+uvicorn[standard]
 langchain
 langgraph
 langchain-core
@@ -7,6 +7,7 @@ langchain-community
 langchain-google-genai
 langchain-groq
 pydantic
+pydantic-settings
 httpx
 aiofiles
 redis
@@ -16,4 +17,4 @@ scipy
 pytest
 loguru
 py-algorand-sdk
-
+python-multipart
