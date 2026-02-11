@@ -417,7 +417,44 @@ def get_settlement_report(settlement_id):
         return jsonify({'error': str(e)}), 500
 
 
-# ==================== HEALTH CHECK ====================
+# ==================== ROOT & HEALTH ====================
+
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint - API documentation"""
+    return jsonify({
+        'message': 'Expense Settlement API - Powered by LangGraph & Algorand',
+        'version': '1.0',
+        'base_url': 'http://127.0.0.1:5000',
+        'endpoints': {
+            'auth': [
+                'POST /auth/login',
+                'POST /auth/connect-wallet'
+            ],
+            'groups': [
+                'POST /groups/create',
+                'POST /groups/<group_id>/members',
+                'GET /groups/<group_id>'
+            ],
+            'expenses': [
+                'POST /expenses/add',
+                'GET /expenses/<group_id>'
+            ],
+            'settlements': [
+                'POST /settlements/calculate',
+                'POST /settlements/execute',
+                'GET /report/<settlement_id>'
+            ],
+            'risk': [
+                'GET /risk-score/<user_id>',
+                'POST /warnings/apply'
+            ],
+            'health': [
+                'GET /health'
+            ]
+        }
+    }), 200
+
 
 @app.route('/health', methods=['GET'])
 def health_check():
