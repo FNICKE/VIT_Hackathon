@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+langchain
+langgraph
+langchain-core
+langchain-community
+langchain-google-genai
+langchain-groq
+pydantic
+httpx
+aiofiles
+redis
+python-dotenv
+numpy
+scipy
+pytest
+loguru
