@@ -1,7 +1,7 @@
 # Imports
 from datetime import datetime
 from typing import Dict
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, START, END
 from ai_agent.state import GroupState
 from ai_agent.tex import tex_optimize
 from ai_agent.risk import calculate_risk_scores
@@ -10,7 +10,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 import json
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
 # Initialising LLM
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.6)
 
@@ -225,10 +227,13 @@ def build_graph():
     graph.add_node("warnings", warning_node)
     graph.add_node("explanation", explanation_node)
     graph.add_node("governance", governance_node)
-    graph.set_entry_point("compute_balances")
+    graph.add_edge(START, "compute_balances")
     graph.add_edge("compute_balances", "tex")
     graph.add_edge("tex", "risk")
     graph.add_edge("risk", "warnings")
     graph.add_edge("warnings", "explanation")
     graph.add_edge("warnings", "governance")
+    graph.add_edge("governance", "onchain_logic") 
+    graph.add_edge("onchain_logic", "explanation")
+    graph.add_edge("explanation", END)
     return graph.compile()

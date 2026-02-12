@@ -61,13 +61,13 @@ def login(req: LoginRequest):
         return {"message": "Login successful", "user_id": users_db[req.email]["id"]}
 
     user_id = str(uuid.uuid4())
-
+    # Call to DB to create user would go here. For now, we just store in-memory
     users_db[req.email] = {
         "id": user_id,
         "email": req.email,
         "password": req.password,
         "wallet": None,
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now().isoformat()
     }
 
     return {"message": "User created", "user_id": user_id}
@@ -75,7 +75,7 @@ def login(req: LoginRequest):
 
 @app.post("/auth/connect-wallet")
 def connect_wallet(req: WalletRequest):
-
+    # In production, you'd verify the user and wallet ownership here via DB
     for user in users_db.values():
         if user["id"] == req.user_id:
             user["wallet"] = req.wallet_address
@@ -104,7 +104,7 @@ def create_group(req: CreateGroupRequest):
 
 @app.post("/groups/{group_id}/members")
 def add_member(group_id: str, req: AddMemberRequest):
-
+    # Group details would be fetched from DB in production
     if group_id not in groups_db:
         raise HTTPException(status_code=404, detail="Group not found")
 
@@ -122,7 +122,7 @@ def add_expense(req: AddExpenseRequest):
         raise HTTPException(status_code=404, detail="Group not found")
 
     expense_id = str(uuid.uuid4())
-
+    # Expenses would be stored in DB and retrieved here.
     expenses_db[expense_id] = {
         "id": expense_id,
         "group_id": req.group_id,
@@ -130,7 +130,7 @@ def add_expense(req: AddExpenseRequest):
         "amount": req.amount,
         "description": req.description,
         "split_among": req.split_among or groups_db[req.group_id]["members"],
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(),
         "settled": False
     }
 
@@ -159,7 +159,7 @@ def calculate_settlement(req: SettlementRequest):
                 "user_id": member,
                 "wallet_address": "",
                 "trust_score": 0.5,
-                "joined_at": datetime.utcnow()
+                "joined_at": datetime.now()
             }
             for member in group["members"]
         ],
@@ -171,13 +171,13 @@ def calculate_settlement(req: SettlementRequest):
         "excluded_members": [],
         "last_action": None,
         "explanation": None,
-        "last_updated": datetime.utcnow()
+        "last_updated": datetime.now()
     }
 
     result = graph.invoke(state)
 
     settlement_id = str(uuid.uuid4())
-
+    # This is the final DB call to store and fetch settlement details. In production, this would be a proper DB insert.
     settlements_db[settlement_id] = {
         "id": settlement_id,
         "group_id": req.group_id,

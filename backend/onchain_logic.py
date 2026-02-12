@@ -3,13 +3,15 @@ from algosdk.v2client import algod
 from algosdk.transaction import PaymentTxn
 import os
 from ai_agent.graph import GroupState
+
 # Initialising Algorand client
 ALGOD_ADDRESS = "https://testnet-api.algonode.cloud"
+
 # Token would be added soon
 ALGOD_TOKEN = ""
 algod_client = algod.AlgodClient(ALGOD_TOKEN, ALGOD_ADDRESS)
 
-
+# On-chain logic
 def onchain_node(state: GroupState) -> GroupState:
 
     governance_actions = state.get("governance_actions", {})
@@ -45,7 +47,10 @@ def onchain_node(state: GroupState) -> GroupState:
                     "removed_from_group": True
                 }
 
-            state["members"].remove(user_id)
+            state["members"] = [
+    m for m in state["members"] if m["id"] != user_id
+]
+
 
     state["onchain_results"] = executed_actions
 

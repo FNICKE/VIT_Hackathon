@@ -9,7 +9,6 @@ class Member(TypedDict):
     trust_score: float          # 0.0 – 1.0
     joined_at: datetime
 
-
 class Expense(TypedDict):
     expense_id: str
     paid_by: str                # user_id
