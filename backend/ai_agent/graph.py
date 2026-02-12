@@ -2,19 +2,30 @@
 from datetime import datetime
 from typing import Dict
 from langgraph.graph import StateGraph, START, END
-from ai_agent.state import GroupState
-from ai_agent.tex import tex_optimize
-from ai_agent.risk import calculate_risk_scores
-from ai_agent.warnings import evaluate_warnings
+from state import GroupState
+from tex import tex_optimize
+from risk import calculate_risk_scores
+from warnings import evaluate_warnings
+from onchain_logic import onchain_node
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 import json
 import os
+import logging
 from dotenv import load_dotenv
+
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Initialising LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.6)
+try:
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.6)
+except Exception as e:
+    logger.warning(f"Google LLM initialization warning: {e}")
+    llm = None
 
 # Node 1: Compute Net Balances
 def compute_balances(state: GroupState) -> GroupState:
@@ -143,6 +154,7 @@ Generate a complete explanation report.""")
 
 # Recommending the member to be removed after LEVEL-3 warning and providing detailed explanation for the same
 llm1 = ChatGroq(model="llama3-8b-8192", temperature=0.7)
+
 def governance_node(state: GroupState) -> GroupState:
     """
     This governs the enforcement actions based on warning levels and risk scores. It uses a smaller, faster LLM to make decisions about user removal and wallet deductions.
@@ -152,67 +164,71 @@ def governance_node(state: GroupState) -> GroupState:
 
     enforcement_decisions = {}
 
-    for user_id, level in warning_levels.items():
+    for user_id, level_str in warning_levels.items():
+        try:
+            # Extract numeric level (LEVEL_3 -> 3, LEVEL_2 -> 2, etc)
+            level_num = 0
+            if level_str == "LEVEL_3":
+                level_num = 3
+            elif level_str == "LEVEL_2":
+                level_num = 2
+            elif level_str == "LEVEL_1":
+                level_num = 1
 
-        if level >= 3:
+            if level_num >= 3:
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", """You are the governance decision engine for AlgoSettler.
+You must strictly follow the decision rules provided.
+You must respond ONLY in valid JSON format.
+Do not add explanations outside JSON.
+Do not include markdown or code blocks."""),
+                    ("human", f"""User ID: {user_id}
+Warning Level: {level_num}
+Outstanding Balance: {balances.get(user_id, 0)}
 
-            prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """
-    You are the on-chain connector of AlgoSettler, which provides the insights to the Algorand node for removal of the user who has not
-    provided the settlem
-    You must strictly follow the decision rules provided.
-    You must respond ONLY in valid JSON format.
-    Do not add explanations outside JSON.
-    Do not include markdown.
-    """
-            ),
-            (
-                "human",
-                f"""
-    User ID: {user_id}
-    Warning Level: {level}
-    Outstanding Balance: {balances.get(user_id, 0)}
+Rules:
+- If warning level >= 3, recommend removal.
+- If balance < 0, recommend wallet deduction.
+- If no action required, return false for both.
+- amount_to_deduct must be positive number.
+- If no deduction, set amount_to_deduct to 0.
 
-    Rules:
-    - If warning level >= 3, recommend removal.
-    - If balance < 0, recommend wallet deduction.
-    - If no action required, return false for both.
-    - amount_to_deduct must be positive number.
-    - If no deduction, set amount_to_deduct to 0.
+Respond ONLY in this JSON format:
+{{
+    "remove_user": true/false,
+    "deduct_wallet": true/false,
+    "amount_to_deduct": 0,
+    "reason": "short explanation"
+}}""")
+                ])
 
-    Respond ONLY in this JSON format:
+                chain = prompt | llm1
+                response = chain.invoke({})
+                
+                try:
+                    decision_text = response.content
+                    # Try to parse JSON from response
+                    import json as json_lib
+                    decision = json_lib.loads(decision_text)
+                except Exception as parse_err:
+                    logger.warning(f"Failed to parse LLM response for {user_id}: {parse_err}")
+                    decision = {
+                        "remove_user": False,
+                        "deduct_wallet": False,
+                        "amount_to_deduct": 0,
+                        "reason": "Parsing failed"
+                    }
 
-    {
-        "remove_user": true/false,
-        "deduct_wallet": true/false,
-        "amount_to_deduct": number,
-        "reason": "short explanation"
-    }
-    """
-            ),
-        ]
-    )
+                enforcement_decisions[user_id] = decision
 
-            chain = prompt | llm1
-            response = chain.invoke({
-                "user_id": user_id,
-                "level": level,
-                "balance": balances.get(user_id, 0)
-            })
-            try:
-                decision = response.content
-            except:
-                decision = {
-                    "remove_user": False,
-                    "deduct_wallet": False,
-                    "amount_to_deduct": 0,
-                    "reason": "Parsing failed"
-                }
-
-            enforcement_decisions[user_id] = decision
+        except Exception as e:
+            logger.error(f"Governance decision failed for {user_id}: {e}")
+            enforcement_decisions[user_id] = {
+                "remove_user": False,
+                "deduct_wallet": False,
+                "amount_to_deduct": 0,
+                "reason": f"Error: {str(e)}"
+            }
 
     state["governance_actions"] = enforcement_decisions
 
@@ -221,19 +237,26 @@ def governance_node(state: GroupState) -> GroupState:
 # Build LangGraph
 def build_graph():
     graph = StateGraph(GroupState)
+    
+    # Add all nodes
     graph.add_node("compute_balances", compute_balances)
     graph.add_node("tex", tex_node)
     graph.add_node("risk", risk_node)
     graph.add_node("warnings", warning_node)
     graph.add_node("explanation", explanation_node)
     graph.add_node("governance", governance_node)
+    graph.add_node("onchain", onchain_node)
+    
+    # Add edges
     graph.add_edge(START, "compute_balances")
     graph.add_edge("compute_balances", "tex")
     graph.add_edge("tex", "risk")
     graph.add_edge("risk", "warnings")
     graph.add_edge("warnings", "explanation")
     graph.add_edge("warnings", "governance")
-    graph.add_edge("governance", "onchain_logic") 
-    graph.add_edge("onchain_logic", "explanation")
+    graph.add_edge("governance", "onchain")
+    graph.add_edge("onchain", END)
+    
+    return graph.compile()
     graph.add_edge("explanation", END)
     return graph.compile()
